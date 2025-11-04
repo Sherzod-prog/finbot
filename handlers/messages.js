@@ -3,13 +3,17 @@ export default function registerMessageHandler(bot, userStates, pool) {
     const chatId = msg.chat.id;
     const text = msg.text;
     if (!text) return;
+    // const menu = [
+    //   [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
+    //   [{ text: "📈 hisobot" }, { text: "⚙️ sozlamalar" }],
+    // ];
 
     if (text === "/start") {
       return bot.sendMessage(chatId, "Quyidagi buyruqlardan foydalaning:", {
         reply_markup: {
           keyboard: [
             [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
-            [{ text: "📈 hisobot" }],
+            [{ text: "📈 hisobot" }, { text: "⚙️ sozlamalar" }],
           ],
           resize_keyboard: true,
         },
@@ -87,13 +91,22 @@ export default function registerMessageHandler(bot, userStates, pool) {
       const balance = totalIncome - totalExpense;
       const report = `📊 Hisobot:\n- Jami kirim: ${totalIncome.toLocaleString()} so'm\n- Jami chiqim: ${totalExpense.toLocaleString()} so'm\n- Balans: ${balance.toLocaleString()} so'm`;
       return bot.sendMessage(chatId, report);
+    } else if (text === "⚙️ sozlamalar") {
+      return bot.sendMessage(chatId, "Sozlamalar bo'limidasiz.", {
+        reply_markup: {
+          keyboard: [
+            [{ text: " kirim categoriya" }, { text: " chiqim categoriya" }],
+            [{ text: "⬅️ ortga" }],
+          ],
+          resize_keyboard: true,
+        },
+      });
     } else if (text === "⬅️ ortga") {
       return bot.sendMessage(chatId, "Asosiy menyu:", {
         reply_markup: {
           keyboard: [
-            [{ text: "➕ kiritish" }],
-            [{ text: "📝 tahrirlash" }],
-            [{ text: "📈 hisobot" }],
+            [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
+            [{ text: "📈 hisobot" }, { text: "⚙️ sozlamalar" }],
           ],
           resize_keyboard: true,
         },
@@ -111,7 +124,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
 
     try {
       if (newState.step === "kirim_amount") {
-        const amount = parseFloat(msg.text);
+        const amount = parseFloat(text);
         if (isNaN(amount)) {
           return bot.sendMessage(
             chatId,
@@ -123,10 +136,10 @@ export default function registerMessageHandler(bot, userStates, pool) {
       }
 
       if (newState.step === "kirim_desc") {
-        const desc = msg.text.trim();
+        const desc = text.trim();
         const amount = newState.amount;
         await pool.query(
-          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
+          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4, $5)",
           [chatId, "kirim", amount, desc]
         );
         bot.sendMessage(
@@ -138,7 +151,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
       }
 
       if (newState.step === "chiqim_amount") {
-        const amount = parseFloat(msg.text);
+        const amount = parseFloat(text);
         if (isNaN(amount)) {
           return bot.sendMessage(
             chatId,
@@ -150,10 +163,10 @@ export default function registerMessageHandler(bot, userStates, pool) {
       }
 
       if (newState.step === "chiqim_desc") {
-        const desc = msg.text.trim();
+        const desc = text.trim();
         const amount = newState.amount;
         await pool.query(
-          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
+          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4, $5)",
           [chatId, "chiqim", amount, desc]
         );
         bot.sendMessage(
@@ -165,7 +178,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
       }
 
       if (newState.step === "edit_amount") {
-        const amount = parseFloat(msg.text);
+        const amount = parseFloat(text);
         if (isNaN(amount)) {
           return bot.sendMessage(
             chatId,
@@ -181,7 +194,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
       }
 
       if (newState.step === "edit_desc") {
-        const desc = msg.text.trim();
+        const desc = text.trim();
         const { transactionId, amount } = newState;
 
         try {

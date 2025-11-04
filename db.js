@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     type VARCHAR(10) NOT NULL,
     amount NUMERIC NOT NULL,
     description TEXT,
+    category VARCHAR(50) NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 `
