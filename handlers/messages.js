@@ -3,18 +3,16 @@ export default function registerMessageHandler(bot, userStates, pool) {
     const chatId = msg.chat.id;
     const text = msg.text;
     if (!text) return;
-    // const menu = [
-    //   [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
-    //   [{ text: "📈 hisobot" }, { text: "⚙️ sozlamalar" }],
-    // ];
+
+    const menu = [
+      [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
+      [{ text: "📈 hisobot" }],
+    ];
 
     if (text === "/start") {
       return bot.sendMessage(chatId, "Quyidagi buyruqlardan foydalaning:", {
         reply_markup: {
-          keyboard: [
-            [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
-            [{ text: "📈 hisobot" }, { text: "⚙️ sozlamalar" }],
-          ],
+          keyboard: menu.map((row) => row.map((btn) => ({ text: btn.text }))),
           resize_keyboard: true,
         },
       });
@@ -104,10 +102,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
     } else if (text === "⬅️ ortga") {
       return bot.sendMessage(chatId, "Asosiy menyu:", {
         reply_markup: {
-          keyboard: [
-            [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
-            [{ text: "📈 hisobot" }, { text: "⚙️ sozlamalar" }],
-          ],
+          keyboard: menu.map((row) => row.map((btn) => ({ text: btn.text }))),
           resize_keyboard: true,
         },
       });
@@ -139,7 +134,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
         const desc = text.trim();
         const amount = newState.amount;
         await pool.query(
-          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4, $5)",
+          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
           [chatId, "kirim", amount, desc]
         );
         bot.sendMessage(
@@ -166,7 +161,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
         const desc = text.trim();
         const amount = newState.amount;
         await pool.query(
-          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4, $5)",
+          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
           [chatId, "chiqim", amount, desc]
         );
         bot.sendMessage(
