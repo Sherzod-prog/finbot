@@ -162,7 +162,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
     async function addCategory(type, name) {
       try {
         await pool.query(
-          "INSERT INTO categories (name, type) VALUES ($1, $2) ON CONFLICT (name, type) DO NOTHING",
+          "INSERT INTO categories (name, type) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
           [name, type]
         );
         bot.sendMessage(
