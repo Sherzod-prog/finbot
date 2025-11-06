@@ -6,7 +6,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
 
     const menu = [
       [{ text: "➕ kiritish" }, { text: "📝 tahrirlash" }],
-      [{ text: "📈 hisobot" }],
+      [{ text: "📈 hisobot" }, { text: "⚙️ sozlamalar" }],
     ];
 
     if (text === "/start") {
@@ -17,15 +17,57 @@ export default function registerMessageHandler(bot, userStates, pool) {
         },
       });
     } else if (text === "➕ kiritish") {
-      return bot.sendMessage(chatId, "Qaysi turdagi kiritish?", {
-        reply_markup: {
-          keyboard: [
-            [{ text: "💰 kirim" }, { text: "💸 chiqim" }],
-            [{ text: "⬅️ ortga" }],
-          ],
-          resize_keyboard: true,
-        },
-      });
+      try {
+        const { rows: categories } = await pool.query(
+          "SELECT * FROM categories WHERE type IN ('kirim', 'chiqim') ORDER BY type DESC, name"
+        );
+
+        if (categories.length === 0) {
+          return bot.sendMessage(
+            chatId,
+            "❌ Hozircha kategoriyalar mavjud emas. Iltimos avval sozlamalar bo'limidan kategoriyalarni qo'shing."
+          );
+        }
+
+        // Group categories by type
+        const kirimButtons = categories
+          .filter((cat) => cat.type === "kirim")
+          .map((cat) => [
+            {
+              text: `💰 ${cat.name}`,
+              callback_data: `category_kirim_${cat.name}`,
+            },
+          ]);
+
+        const chiqimButtons = categories
+          .filter((cat) => cat.type === "chiqim")
+          .map((cat) => [
+            {
+              text: `💸 ${cat.name}`,
+              callback_data: `category_chiqim_${cat.name}`,
+            },
+          ]);
+
+        const keyboard = [
+          [{ text: "💰 Kirim kategoriyalari:", callback_data: "ignore" }],
+          ...kirimButtons,
+          [{ text: "💸 Chiqim kategoriyalari:", callback_data: "ignore" }],
+          ...chiqimButtons,
+          [{ text: "⬅️ Ortga", callback_data: "back_to_main" }],
+        ];
+
+        return bot.sendMessage(chatId, "Kategoriyani tanlang:", {
+          reply_markup: {
+            inline_keyboard: keyboard,
+          },
+        });
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+        return bot.sendMessage(
+          chatId,
+          "❌ Kategoriyalarni yuklashda xatolik yuz berdi."
+        );
+      }
     } else if (text === "📝 tahrirlash") {
       return bot.sendMessage(
         chatId,
@@ -50,9 +92,9 @@ export default function registerMessageHandler(bot, userStates, pool) {
       );
       return bot.sendMessage(chatId, `So'nggi 5 kirim yozuvi:`, {
         reply_markup: {
-          inline_keyboard: last.rows.map((row) => [
+          inline_keyboard: last.rows.map((row, i) => [
             {
-              text: `ID: ${row.id}, ${row.amount} so'm - ${row.description}`,
+              text: `${i + 1}. ${row.amount} so'm - ${row.description}`,
               callback_data: `edit_${row.id}`,
             },
           ]),
@@ -65,9 +107,9 @@ export default function registerMessageHandler(bot, userStates, pool) {
       );
       return bot.sendMessage(chatId, `So'nggi 5 chiqim yozuvi:`, {
         reply_markup: {
-          inline_keyboard: last.rows.map((row) => [
+          inline_keyboard: last.rows.map((row, i) => [
             {
-              text: `ID: ${row.id}, ${row.amount} so'm - ${row.description}`,
+              text: `${i + 1}. ${row.amount} so'm - ${row.description}`,
               callback_data: `edit_${row.id}`,
             },
           ]),
@@ -93,7 +135,7 @@ export default function registerMessageHandler(bot, userStates, pool) {
       return bot.sendMessage(chatId, "Sozlamalar bo'limidasiz.", {
         reply_markup: {
           keyboard: [
-            [{ text: " kirim categoriya" }, { text: " chiqim categoriya" }],
+            [{ text: "kirim kategoriya" }, { text: "chiqim kategoriya" }],
             [{ text: "⬅️ ortga" }],
           ],
           resize_keyboard: true,
@@ -106,18 +148,77 @@ export default function registerMessageHandler(bot, userStates, pool) {
           resize_keyboard: true,
         },
       });
-    } else if (text === "💰 kirim") {
-      userStates.set(chatId, { step: "kirim_amount" });
-      return bot.sendMessage(chatId, "Kirim miqdorini kiriting:");
-    } else if (text === "💸 chiqim") {
-      userStates.set(chatId, { step: "chiqim_amount" });
-      return bot.sendMessage(chatId, "Chiqim miqdorini kiriting:");
+    } else if (text === "kirim kategoriya") {
+      userStates.set(chatId, { step: "kirim_categoriya" });
+      return bot.sendMessage(chatId, "Kirim categoriya nomini kiriting.");
+    } else if (text === "chiqim kategoriya") {
+      userStates.set(chatId, { step: "chiqim_categoriya" });
+      return bot.sendMessage(chatId, "Kategoriyani tanlang.");
     }
 
     const newState = userStates.get(chatId);
     if (!newState) return;
 
+    async function addCategory(type, name) {
+      try {
+        await pool.query(
+          "INSERT INTO categories (name, type) VALUES ($1, $2) ON CONFLICT (name, type) DO NOTHING",
+          [name, type]
+        );
+        bot.sendMessage(
+          chatId,
+          `✅ "${name}" nomli ${
+            type === "kirim" ? "kirim" : "chiqim"
+          } kategoriyasi muvaffaqiyatli qo'shildi!`
+        );
+      } catch (err) {
+        console.error("Error adding category:", err);
+        bot.sendMessage(
+          chatId,
+          "❌ Kategoriyani qo'shishda xatolik yuz berdi."
+        );
+      }
+    }
+
     try {
+      // Handle category selection state
+      if (newState.step === "select_category") {
+        const category = await pool.query(
+          "SELECT name, type FROM categories WHERE name = $1",
+          [text]
+        );
+
+        if (category.rows.length === 0) {
+          bot.sendMessage(chatId, "❌ Bunday kategoriya topilmadi!");
+          return;
+        }
+
+        const { name, type } = category.rows[0];
+        userStates.set(chatId, {
+          step: `${type}_amount`,
+          category: name,
+        });
+
+        bot.sendMessage(
+          chatId,
+          `${
+            type === "kirim" ? "💰" : "💸"
+          } ${name} kategoriyasi tanlandi.\nMiqdorni kiriting:`
+        );
+        return;
+      }
+      if (newState.step === "kirim_categoriya") {
+        const categoryName = text.trim();
+        addCategory("kirim", categoryName);
+        userStates.delete(chatId);
+        return;
+      }
+      if (newState.step === "chiqim_categoriya") {
+        const categoryName = text.trim();
+        addCategory("chiqim", categoryName);
+        userStates.delete(chatId);
+        return;
+      }
       if (newState.step === "kirim_amount") {
         const amount = parseFloat(text);
         if (isNaN(amount)) {
@@ -126,25 +227,10 @@ export default function registerMessageHandler(bot, userStates, pool) {
             "❌ Iltimos, miqdor sifatida raqam kiriting!"
           );
         }
-        userStates.set(chatId, { step: "kirim_desc", amount });
+        const category = newState.category || null;
+        userStates.set(chatId, { step: "kirim_desc", category, amount });
         return bot.sendMessage(chatId, `Iltimos, kirim uchun izoh kiriting:`);
       }
-
-      if (newState.step === "kirim_desc") {
-        const desc = text.trim();
-        const amount = newState.amount;
-        await pool.query(
-          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
-          [chatId, "kirim", amount, desc]
-        );
-        bot.sendMessage(
-          chatId,
-          `✅ ${amount.toLocaleString()} so'm daromad qo'shildi! Izoh: ${desc}`
-        );
-        userStates.delete(chatId);
-        return;
-      }
-
       if (newState.step === "chiqim_amount") {
         const amount = parseFloat(text);
         if (isNaN(amount)) {
@@ -153,25 +239,38 @@ export default function registerMessageHandler(bot, userStates, pool) {
             "❌ Iltimos, miqdor sifatida raqam kiriting!"
           );
         }
-        userStates.set(chatId, { step: "chiqim_desc", amount });
+        const category = newState.category || null;
+        userStates.set(chatId, { step: "chiqim_desc", category, amount });
         return bot.sendMessage(chatId, `Iltimos, chiqim uchun izoh kiriting:`);
       }
-
-      if (newState.step === "chiqim_desc") {
+      if (newState.step === "kirim_desc") {
         const desc = text.trim();
-        const amount = newState.amount;
+        const { amount, category } = newState;
         await pool.query(
-          "INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
-          [chatId, "chiqim", amount, desc]
+          "INSERT INTO transactions (user_id, type, amount, category, description) VALUES ($1, $2, $3, $4, $5)",
+          [chatId, "kirim", amount, category, desc]
         );
         bot.sendMessage(
           chatId,
-          `✅ ${amount.toLocaleString()} so'm chiqim qo'shildi! Izoh: ${desc}`
+          `✅ ${amount.toLocaleString()} so'm daromad qo'shildi!\nKategoriya: ${category}\nIzoh: ${desc}`
         );
         userStates.delete(chatId);
         return;
       }
-
+      if (newState.step === "chiqim_desc") {
+        const desc = text.trim();
+        const { amount, category } = newState;
+        await pool.query(
+          "INSERT INTO transactions (user_id, type, amount, category, description) VALUES ($1, $2, $3, $4, $5)",
+          [chatId, "chiqim", amount, category, desc]
+        );
+        bot.sendMessage(
+          chatId,
+          `✅ ${amount.toLocaleString()} so'm chiqim qo'shildi!\nKategoriya: ${category}\nIzoh: ${desc}`
+        );
+        userStates.delete(chatId);
+        return;
+      }
       if (newState.step === "edit_amount") {
         const amount = parseFloat(text);
         if (isNaN(amount)) {
@@ -187,7 +286,6 @@ export default function registerMessageHandler(bot, userStates, pool) {
         });
         return bot.sendMessage(chatId, "Yangi izohni kiriting:");
       }
-
       if (newState.step === "edit_desc") {
         const desc = text.trim();
         const { transactionId, amount } = newState;

@@ -14,9 +14,16 @@ CREATE TABLE IF NOT EXISTS transactions (
     user_id BIGINT NOT NULL,
     type VARCHAR(10) NOT NULL,
     amount NUMERIC NOT NULL,
+    category VARCHAR(50) NOT NULL,
     description TEXT,  
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);`
+);
+CREATE TABLE IF NOT EXISTS categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    type VARCHAR(10) NOT NULL CHECK (type IN ('kirim', 'chiqim'))    
+);
+`
   )
   .catch((err) => console.error("Error creating transactions table:", err));
 
